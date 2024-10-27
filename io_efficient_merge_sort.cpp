@@ -33,11 +33,23 @@ Term split_doc_id_frequency(int file_index, string line) {
     return term;
 }
 
+long get_documents_count_per_term(string document_id_string)
+{
+    std::istringstream stream(document_id_string);
+    string doc_id, freq;
+    long doc_count = 0;
+    while (stream >> doc_id >> freq) {
+        doc_count++;
+    }
+    return doc_count;
+}
+
 int main() 
 {
     float BATCH_SIZE = 10000;
     int num_of_intermediate_files = ceil(8841823/BATCH_SIZE);
     ofstream inverted_index = ofstream("final_inverted_index.txt");
+    ofstream lexicon = ofstream("lexicon.txt");
     vector<ifstream> intermediate_files(num_of_intermediate_files);
     priority_queue<Term, vector<Term>> min_heap;
 
@@ -57,15 +69,19 @@ int main()
     string prev = min_heap.top().term;
     string doc_freq_combined = "";
     long terms_processed = 0;
+    long term_id = 0;
     while(!min_heap.empty()) {
         Term min_term = min_heap.top();
         min_heap.pop();
         if (min_term.term != prev)
         {
-            inverted_index<<prev<<": "<<doc_freq_combined<<endl;
-            doc_freq_combined = min_term.doc_frequency + " ";
+            long document_count_per_term = get_documents_count_per_term(doc_freq_combined);
+            inverted_index<<prev<<":"<<doc_freq_combined<<endl;
+            lexicon<<prev<<" "<<term_id<<" "<<document_count_per_term<<endl;
+            doc_freq_combined = min_term.doc_frequency;
+            term_id++;
         }
-        else doc_freq_combined = doc_freq_combined + min_term.doc_frequency;
+        else doc_freq_combined = doc_freq_combined + " " + min_term.doc_frequency;
         string line;
         if (getline(intermediate_files[min_term.intermediate_file_index], line)) {
             Term term = split_doc_id_frequency(min_term.intermediate_file_index, line);
@@ -80,7 +96,10 @@ int main()
         terms_processed++;
         if (terms_processed % 10000 == 0) cout<<"Terms Processed : "<<terms_processed<<endl;
     }
-    inverted_index<<prev<<": "<<doc_freq_combined<<endl;
+    long document_count_per_term = get_documents_count_per_term(doc_freq_combined);
+    inverted_index<<prev<<":"<<doc_freq_combined<<endl;
+    lexicon<<prev<<" "<<term_id<<" "<<document_count_per_term<<endl;
+    lexicon.close();
     inverted_index.close();
     return 0;
 }

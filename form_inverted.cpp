@@ -15,13 +15,18 @@ void print_inverted_index(int file_index, map<string, vector<pair<string, long>>
     ofstream output_file(file_name);
     for (const auto& term : inverted_index)
     {
-        output_file << term.first << " : ";
+        output_file << term.first << ":";
         for (const auto& document_term : term.second)
         {
-            output_file << "(" << document_term.first << ", " << document_term.second << "), ";
+            output_file << document_term.first << " " << document_term.second;
+            if (&document_term != &term.second.back())
+            {
+                output_file << " ";
+            }
         }
         output_file << endl;
     }
+    output_file.close();
     cout << "Intermediate Inverted Index " << file_index << " file saved" << endl;
 }
 
@@ -74,6 +79,11 @@ string cleanWord(string word) {
     return word;
 }
 
+void update_document_index(ofstream &document_index, string doc_id, long word_count)
+{
+    document_index<<doc_id<<" "<<word_count<<endl;
+}
+
 int main()
 {
     ifstream file("collection.tsv");
@@ -81,16 +91,18 @@ int main()
         cerr << "Error: Could not open the file!" << endl;
         return 1;
     }
-
+    ofstream document_index("document_index.txt");
     string line;
     map<string, vector<pair<string, long>>> intermediate_inverted_index;
     const int PASSAGES_PER_INVERTED_INDEX = 10000;
     int current_passage_index = 0;
     int intermediate_file_index = 0;
-
+    long total_word_count = 0;
+    long total_documents = 0;
     // Loop until the end of the file
     while (getline(file, line))
     {
+        total_documents++;
         if (line.empty()) continue;  // Skip empty lines
         
         istringstream line_stream(line);
@@ -103,15 +115,20 @@ int main()
 
         istringstream passage_stream(passage);
         // Process each word in the passage
+
+        long word_count = 0;
         while (passage_stream >> word)
         {
             word = cleanWord(word);
             if (word.empty()) {
                 continue;
             }
+            word_count++;
             terms_per_document[word] += 1;
         }
 
+        total_word_count = total_word_count + word_count;
+        update_document_index(document_index, doc_id, word_count);
         // Update the inverted index with the terms from this document
         update_inverted_index(doc_id, intermediate_inverted_index, terms_per_document);
 
@@ -133,6 +150,8 @@ int main()
         print_inverted_index(intermediate_file_index, intermediate_inverted_index);
     }
 
+    document_index<<total_word_count/total_documents;
+    document_index.close();
     file.close();
     return 0;
 }
