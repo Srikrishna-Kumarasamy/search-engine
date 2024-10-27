@@ -29,7 +29,7 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
 }
 
         // Position: words position based on the term id from lexicon
-        void get_inverted_index_Metadatas_based_on_position(ifstream& bin_in_file,unsigned long int position,unsigned long int lastdocsize,vector<unsigned long int> &read_Last_docIds_data,unsigned long int &lengthOfChunksizeList,vector<unsigned long int> &read_chunksize_data)
+        void get_inverted_index_Metadatas_based_on_position(ifstream& bin_in_file,unsigned long int position,unsigned long int &lastdocsize,vector<unsigned long int> &read_Last_docIds_data,unsigned long int &lengthOfChunksizeList,vector<unsigned long int> &read_chunksize_data)
         {
             for(unsigned long int i=0;i<position-1;i++)
                 {
@@ -89,7 +89,7 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
     void get_mini_block_DocIDs_and_Freq( ifstream& bin_in_file, unsigned long int docID_to_be_searched, vector<u_int8_t> &miniBlock_DocID ,vector<u_int8_t> &miniBlock_Freq,unsigned long int &lastdocsize, vector<unsigned long int> &read_chunksize_data,vector<unsigned long int> &read_Last_docIds_data)
     {
          // To retrieve the particular Block based on the DocID
-        unsigned long int docID_to_be_searched;
+        // unsigned long int docID_to_be_searched;
         unsigned long int total_chunk_Size=0UL;
         for(unsigned long int i=0;i<lastdocsize;i++)
              {
@@ -126,9 +126,9 @@ void inverted_index_DAAT()
     vector<unsigned long int> read_Last_docIds_data;
     unsigned long int lengthOfChunksizeList=0UL;
     vector<unsigned long int> read_chunksize_data;
-    get_inverted_index_Metadatas_based_on_position(bin_in_file,2UL,lastdocsize,read_Last_docIds_data,lengthOfChunksizeList,read_chunksize_data);
-    
-    
+    get_inverted_index_Metadatas_based_on_position(bin_in_file,16UL,lastdocsize,read_Last_docIds_data,lengthOfChunksizeList,read_chunksize_data);
+    cout<<lastdocsize<<" "<<read_Last_docIds_data<<" "<<lengthOfChunksizeList<<" "<<read_chunksize_data<<endl;
+   
     
 
 

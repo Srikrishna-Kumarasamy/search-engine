@@ -186,8 +186,8 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
                         // Parse the DocIDs and Freqs
                         stringstream lineStream(line);
                         string token,data;
-                            getline(lineStream,token,':');
-                            getline(lineStream,token,':');
+                        getline(lineStream,token,':');
+                        getline(lineStream,token,':');
                         stringstream dataStream(token);
                         vector<unsigned long int> docList;
                         vector<unsigned long int> freqList;
@@ -196,7 +196,7 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
                         {
                             unsigned long int data_in_num;
                             istringstream(data) >> data_in_num;
-                            docList.push_back(data_in_num-1);
+                            docList.push_back(data_in_num);
                             getline(dataStream,data,' ');
                             istringstream(data) >> data_in_num;
                             freqList.push_back(data_in_num-1);
@@ -290,7 +290,7 @@ int main()
 
 
     // cout << "Hello";
-   convert_TermDetails_To_PreCompression("test.txt");
+   convert_TermDetails_To_PreCompression("intermediate_inverted_indices/intermediate_inverted_index_0.txt");
 
     
     // ofstream bin_file("data1.bin", ios::binary);
