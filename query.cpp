@@ -27,6 +27,138 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
     os << "]";
     return os;
 }
+int find_document_size(ifstream& document_index, unsigned long int target_document_id) {
+    string line;
+    while(getline(document_index, line)) {
+        stringstream words(line);
+        unsigned long int document_id;
+        int document_size;
+        words>>document_id>>document_size;
+        // cout<<document_id<<" "<<document_size<<endl;
+        if(document_id == target_document_id) {
+            return document_size;
+        }
+    }
+    return -1;
+}
+
+int get_avg_document_size(ifstream& document_index) {
+    document_index.seekg(0, std::ios::end);
+    streampos fileSize = document_index.tellg();
+    string lastLine;
+    char ch;
+    for (std::streamoff i = 1; i < fileSize; ++i) {
+        document_index.seekg(-i, std::ios::end);
+        document_index.get(ch);
+        if (ch == '\n') {
+            getline(document_index, lastLine);
+            return stoi(lastLine);
+        }
+    }
+    return -1;
+}
+class LexiconTerm {
+    public:
+    string term;
+    string term_id;
+    long number_of_documents;
+    unsigned long int binary_position;
+
+    bool operator<(const LexiconTerm& other) const {
+        return this->number_of_documents < other.number_of_documents;
+    }
+};
+
+    class DocumentScore{
+        public:
+        unsigned long int docID;
+        double score;
+        DocumentScore(unsigned long int docID,double score)
+        {
+            this->docID=docID;
+            this->score=score;
+        }
+        // Define operator< for max-heap (higher score has higher priority)
+    bool operator<(const DocumentScore& other) const {
+        return this->score < other.score;  // Max-heap based on score
+    }
+
+    };
+
+void get_query_terms_lexicon(ifstream& lexicon_file, vector<string> query_terms, vector<LexiconTerm>& lexicon_terms) {
+    string line;
+    sort(query_terms.begin(), query_terms.end());
+    for(auto& target_term: query_terms)
+    {
+        while(getline(lexicon_file, line))
+        {
+            stringstream words(line);
+            LexiconTerm lexicon_term;
+            words>>lexicon_term.term>>lexicon_term.term_id>>lexicon_term.number_of_documents>>lexicon_term.binary_position;
+            if(lexicon_term.term == target_term)
+            {
+                lexicon_terms.push_back(lexicon_term);
+                break;
+            }
+        }
+    }
+}
+
+            // BM25 parameters
+        const double k1 = 1.5;
+        const double b = 0.75;
+
+        // Function to calculate IDF
+        double calculateIDF(int N, int docFreq) {
+            return log((N - docFreq + 0.5) / (docFreq + 0.5) + 1);
+        }
+
+        // Function to calculate BM25 score for a document given a query
+        //df => Number of Documents containing that term
+        // tf=> Term frequency
+        // N => Total Number of Doucments in the collection
+        // docLength => current document length (word count)
+        // avgDocLength => Averge length of the entire documents (word count)
+        double calculateBM25(int docLength, int avgDocLength,  int N, unsigned long int tf,unsigned long int df) {
+            double score = 0.0;
+                // Calculate IDF for the term
+                double idf = calculateIDF(N, df);
+
+                // Calculate BM25 term score
+                double numerator = tf * (k1 + 1);
+                double denominator = tf + k1 * (1 - b + b * (docLength / static_cast<double>(avgDocLength)));
+                score += idf * (numerator / denominator);
+            
+
+            return score;
+        }
+
+
+    int binary_search(vector<unsigned long int> arr,unsigned long int key)
+    {
+            int left = 0;
+        int right = arr.size() - 1;
+
+        while (left <= right) {
+            int mid = left + (right - left) / 2;  // Avoids overflow
+
+            // Check if the target is at mid
+            if (arr[mid] == key) {
+                return mid;  // Target found
+            }
+
+            // If target is greater, ignore the left half
+            if (arr[mid] < key) {
+                left = mid + 1;
+            }
+            // If target is smaller, ignore the right half
+            else {
+                right = mid - 1;
+            }
+        }
+
+        return -1;  // Target not found
+    }
 
     vector<unsigned long> varbyte_decompress(const vector<uint8_t>& encoded_data) {
             vector<unsigned long> decompressed_values;
@@ -92,10 +224,34 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
             }
 
 
-   void calculate_score(ifstream& bin_in_file,unsigned long int &lastdocsize, vector<unsigned long int> &read_chunksize_data  ,vector<unsigned long int> queryTermPositions)
+     priority_queue<DocumentScore> query_process(  vector<string> target_terms )
    {
+
+        ifstream document_index = ifstream("document_index.txt");
+        int avg_document_size=get_avg_document_size(document_index);
+        document_index.seekg(0);
+        
+        ifstream lexicon_file = ifstream("lexicon.txt");
+      
+        vector<LexiconTerm> lexicon_terms;
+        get_query_terms_lexicon(lexicon_file, target_terms, lexicon_terms);
+        sort(lexicon_terms.begin(), lexicon_terms.end());
+
+            // File pointer for Primary term
+            ifstream bin_in_file("data.bin", ios::binary);
+            unsigned long int lastdocsize=0UL;
+            vector<unsigned long int> read_Last_docIds_data;
+            unsigned long int lengthOfChunksizeList=0UL;
+            vector<unsigned long int> read_chunksize_data;
+            // Movement of pointer for primary term
+            bin_in_file.seekg(lexicon_terms[0].binary_position,ios::cur);
+            get_inverted_index_Metadatas_based_on_position(bin_in_file,16UL,lastdocsize,read_Last_docIds_data,lengthOfChunksizeList,read_chunksize_data);
+           
+
+        priority_queue<DocumentScore> max_heap_score;
        // To retreieve the doclist (Entire)
-       unsigned long int score=0;
+        double primaryTermScore=0.0,otherScores=0.0;
+        
         for(unsigned long int i=0; i< lastdocsize ; i++ )
         {
 
@@ -110,16 +266,16 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
             //Call miniBlock DocID based on DocID search
             vector<unsigned long int> decompressed_docID_block= varbyte_decompress(docId_compressed_list);
             vector<unsigned long int> decompressed_freq_block= varbyte_decompress(freq_compressed_list);
-            
             //Inside block traversal
             for(int blockIndex=0;blockIndex <  decompressed_docID_block.size();blockIndex++)
             {
                 //For the indexed word score calcualtion here
-
+                int document_size=find_document_size(document_index,decompressed_docID_block[blockIndex] );
+                primaryTermScore=calculateBM25( document_size,avg_document_size,8400000,decompressed_freq_block[blockIndex], lexicon_terms[0].number_of_documents);
                 // Score calculation if there are more terms
-                if(queryTermPositions.size()>1)
+                if(lexicon_terms.size()>1)
                 {
-                    for(unsigned long int index=0;index < queryTermPositions.size();index++)
+                    for(unsigned long int index=1;index < lexicon_terms.size();index++)
                     {
                         ifstream invertedList_term_pointer("data.bin", ios::binary);
                         unsigned long int lastdocsize=0UL;
@@ -127,7 +283,7 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
                         unsigned long int lengthOfChunksizeList=0UL;
                         vector<unsigned long int> read_chunksize_data;
                         // To move the pointer for reading in the binary file
-                        bin_in_file.seekg( queryTermPositions[index] , ios::cur);
+                        bin_in_file.seekg( lexicon_terms[index].binary_position , ios::cur);
                         // For reading Metadata
                         get_inverted_index_Metadatas_based_on_position(invertedList_term_pointer,16UL,lastdocsize,read_Last_docIds_data,lengthOfChunksizeList,read_chunksize_data);
                         cout<<lastdocsize<<" "<<read_Last_docIds_data<<" "<<lengthOfChunksizeList<<" "<<read_chunksize_data<<endl;
@@ -137,17 +293,37 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
                         vector<unsigned long int> miniBlock_Freq;
                         get_mini_block_DocIDs_and_Freq(invertedList_term_pointer, decompressed_docID_block[blockIndex] ,miniBlock_DocID,miniBlock_Freq,lastdocsize,read_chunksize_data,read_Last_docIds_data);
 
-                        // Condition check
-                    
+                        // Condition check using binary search
+                        int mini_block_position=0;
+                        if((mini_block_position=binary_search(miniBlock_DocID,decompressed_docID_block[blockIndex]))!=-1)
+                        {
+                            // score calucaltion here
+                            document_size=find_document_size(document_index,decompressed_docID_block[blockIndex] );
+                            otherScores+=calculateBM25( document_size,avg_document_size,8400000,decompressed_freq_block[blockIndex], lexicon_terms[index].number_of_documents);
+               
+                        }
+                        else{
+                            break;
+                        }
+
 
                         invertedList_term_pointer.close();
                     }
+                    //skipping as based on conjuntive there are no other terms with same DocID
+                    if(otherScores==primaryTermScore)
+                    continue;
+
                 }
+            max_heap_score.push(DocumentScore(decompressed_docID_block[blockIndex],primaryTermScore+otherScores));
+            otherScores=0.0;
+
             }
 
            
 
         }
+
+        return max_heap_score;
          }
    
             void get_mini_block_DocIDs_and_Freq( ifstream& bin_in_file, unsigned long int docID_to_be_searched, vector<unsigned long int> &miniBlock_DocID 
@@ -185,28 +361,14 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
 
         int main()
         {
-            // Needed for traversal : Last DocIdSize, Last DocIDs List, ChunkSize length, ChunkSize list
+            vector<string> target_terms = {"apple", "pragya", "semi-reduced"};
 
-
-            ifstream bin_in_file("data.bin", ios::binary);
-            unsigned long int lastdocsize=0UL;
-            vector<unsigned long int> read_Last_docIds_data;
-            unsigned long int lengthOfChunksizeList=0UL;
-            vector<unsigned long int> read_chunksize_data;
-            get_inverted_index_Metadatas_based_on_position(bin_in_file,16UL,lastdocsize,read_Last_docIds_data,lengthOfChunksizeList,read_chunksize_data);
-            cout<<lastdocsize<<" "<<read_Last_docIds_data<<" "<<lengthOfChunksizeList<<" "<<read_chunksize_data<<endl;
-            
-            // Decompress block by block for the the entire term or based on the condition
-            vector<u_int8_t> entireBlock_DocID,entireBlock_Freq;
-
-            
-
-
-            
-
-
-            //Closing any instance
-            bin_in_file.close();
-
+            priority_queue<DocumentScore> result= query_process(target_terms);
+            for(int i=0;i<5;i++)
+            {
+                DocumentScore resultDoc=result.top();
+                cout<<"Document ID = "<<resultDoc.docID<<" Score = "<<resultDoc.score;
+                result.pop();
+            }
             return 0;
         }
