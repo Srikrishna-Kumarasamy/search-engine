@@ -11,7 +11,8 @@ using namespace std;
 
 void print_inverted_index(int file_index, map<string, vector<pair<string, long>>> inverted_index)
 {
-    string file_name = format("intermediate_inverted_indices/intermediate_inverted_index_{}.txt", file_index);
+    // string file_name = format("intermediate_inverted_indices/intermediate_inverted_index_{}.txt", file_index);
+    string file_name = format("test_intermediate/intermediate_inverted_index_{}.txt", file_index);
     ofstream output_file(file_name);
     for (const auto& term : inverted_index)
     {
@@ -91,17 +92,20 @@ int main()
         cerr << "Error: Could not open the file!" << endl;
         return 1;
     }
-    ofstream document_index("document_index.txt");
+    ofstream document_index("test_document_index.txt");
     string line;
     map<string, vector<pair<string, long>>> intermediate_inverted_index;
-    const int PASSAGES_PER_INVERTED_INDEX = 10000;
+    // const int PASSAGES_PER_INVERTED_INDEX = 10000;
+    const int PASSAGES_PER_INVERTED_INDEX = 5;
     int current_passage_index = 0;
     int intermediate_file_index = 0;
     long total_word_count = 0;
     long total_documents = 0;
     // Loop until the end of the file
-    while (getline(file, line))
+    int d = 0;
+    while (getline(file, line) && d < 20)
     {
+        d++;
         total_documents++;
         if (line.empty()) continue;  // Skip empty lines
         
@@ -112,7 +116,7 @@ int main()
         // Extract doc_id and passage from the line
         getline(line_stream, doc_id, '\t');
         getline(line_stream, passage);
-
+        // cout<<doc_id<<" "<<passage<<endl;
         istringstream passage_stream(passage);
         // Process each word in the passage
 
@@ -120,6 +124,7 @@ int main()
         while (passage_stream >> word)
         {
             word = cleanWord(word);
+            // cout<<word<<endl;
             if (word.empty()) {
                 continue;
             }
@@ -131,7 +136,7 @@ int main()
         update_document_index(document_index, doc_id, word_count);
         // Update the inverted index with the terms from this document
         update_inverted_index(doc_id, intermediate_inverted_index, terms_per_document);
-
+        cout<<current_passage_index<<endl;
         current_passage_index++;
 
         // If we have reached the passage limit, write the intermediate index to file

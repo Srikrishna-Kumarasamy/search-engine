@@ -62,14 +62,14 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
         for(unsigned long int i=0;i<docList.size();i++)
         {
             vector< uint8_t> compressed_Number_Vector= varbyte_encode(docList[i]);
-            cout<<docList[i]<< " Var byte encoded size :"<< compressed_Number_Vector.size()<<endl;
+            // cout<<docList[i]<< " Var byte encoded size :"<< compressed_Number_Vector.size()<<endl;
             tempSize+=compressed_Number_Vector.size();
             finalList.insert(finalList.end(), compressed_Number_Vector.begin(),compressed_Number_Vector.end());
             if( (i+1) % 128 ==0 )
             {
                 chunkSize.push_back(tempSize);
                 finalCompressedList.push_back(finalList);
-                cout<<"*"<<finalList.size()<<"*";
+                // cout<<"*"<<finalList.size()<<"*";
                 totalSize+=finalList.size();
                 finalList.clear();
                 tempSize=0UL;
@@ -82,7 +82,7 @@ ostream& operator<<(ostream& os, const vector<u_int8_t>& vec) {
             totalSize+=finalList.size();
             finalCompressedList.push_back(finalList);
         }
-        cout<<"="<<totalSize<<"=";
+        // cout<<"="<<totalSize<<"=";
         return finalCompressedList;
     }
 
@@ -125,9 +125,6 @@ class Term {
     string doc_frequency;
     int intermediate_file_index;
 
-
-    
-
     Term(string term, string doc_frequency, int intermediate_file_index)
     {
         this->term = term;
@@ -146,7 +143,7 @@ Term split_doc_id_frequency(int file_index, string line) {
     size_t colonPos = line.find(':');
     Term term = Term(
         line.substr(0, colonPos),
-        line.substr(colonPos + 2),
+        line.substr(colonPos + 1),
         file_index
     );
     return term;
@@ -222,8 +219,8 @@ long get_documents_count_per_term(string document_id_string)
 
                       store_mini_blocks_In_bin(bin_file,compressed_doc_id_block_list,compressed_freq_block_list);
 
-                        cout << lastDocIds<<endl<<docList<<endl<<freqList;
-                        cout<< lastDocIdList_size  <<" "<< chunkList_size   <<" "<< compressed_docid_size <<" "<< compressed_freq_size <<" Total size = "<<totalBlockSize<<endl;
+                        // cout << lastDocIds<<endl<<docList<<endl<<freqList;
+                        // cout<< lastDocIdList_size  <<" "<< chunkList_size   <<" "<< compressed_docid_size <<" "<< compressed_freq_size <<" Total size = "<<totalBlockSize<<endl;
                         
                     return totalBlockSize;
                 }
@@ -232,15 +229,16 @@ int main()
 {
     float BATCH_SIZE = 10000;
     unsigned long int position=0UL;
-    int num_of_intermediate_files = ceil(8841823/BATCH_SIZE);
-    ofstream inverted_index = ofstream("final_inverted_index.txt");
-    ofstream lexicon = ofstream("lexicon.txt");
-    ofstream bin_file("data.bin", ios::binary);
+    // int num_of_intermediate_files = ceil(8841823/BATCH_SIZE);
+    int num_of_intermediate_files = 4;
+    ofstream inverted_index = ofstream("test_final_inverted_index.txt");
+    ofstream lexicon = ofstream("test_lexicon.txt");
+    ofstream bin_file("test_data.bin", ios::binary);
     vector<ifstream> intermediate_files(num_of_intermediate_files);
     priority_queue<Term, vector<Term>> min_heap;
 
     for(int i=0; i < num_of_intermediate_files; i++) {
-        string file_name = "intermediate_inverted_indices/intermediate_inverted_index_" + to_string(i) + ".txt";
+        string file_name = "test_intermediate/intermediate_inverted_index_" + to_string(i) + ".txt";
         intermediate_files[i].open(file_name);
     }
 
@@ -253,25 +251,36 @@ int main()
     }
     
     string prev = min_heap.top().term;
+    Term prev_term = min_heap.top();
     string doc_freq_combined = "";
     long terms_processed = 0;
     long term_id = 0;
     while(!min_heap.empty()) {
         Term min_term = min_heap.top();
         min_heap.pop();
+        if(min_term.term == "desert")
+        {
+            // cout<<prev<<" "<<doc_freq_combined<<endl;
+            cout<<min_term.term<<" "<<min_term.doc_frequency<<endl;
+        }
         if (min_term.term != prev)
         {
+            // cout<<doc_freq_combined<<endl;
             long document_count_per_term = get_documents_count_per_term(doc_freq_combined);
-
-            //inverted_index<<prev<<":"<<doc_freq_combined<<endl;
-
-            position+=compress(prev+":"+doc_freq_combined,bin_file);
-
+            // if(prev == "desert")
+            // {
+            //     cout<<prev<<" "<<doc_freq_combined<<endl;
+            //     cout<<prev_term.term<<" "<<prev_term.doc_frequency<<endl;
+            // }
+            inverted_index<<prev<<":"<<doc_freq_combined<<endl;
             lexicon<<prev<<" "<<term_id<<" "<<document_count_per_term<<" "<<position<<endl;
+            position+=(sizeof(unsigned long int)+compress(prev+":"+doc_freq_combined,bin_file));
+
+           
             doc_freq_combined = min_term.doc_frequency;
             term_id++;
         }
-        else doc_freq_combined = doc_freq_combined + " " + min_term.doc_frequency;
+        else doc_freq_combined = doc_freq_combined + min_term.doc_frequency + " ";
         string line;
         if (getline(intermediate_files[min_term.intermediate_file_index], line)) {
             Term term = split_doc_id_frequency(min_term.intermediate_file_index, line);
@@ -279,17 +288,18 @@ int main()
         }
         else 
         {
-            cout<<min_term.intermediate_file_index<<endl;
+            // cout<<min_term.intermediate_file_index<<endl;
             intermediate_files[min_term.intermediate_file_index].close();
         }
         prev = min_term.term;
+        prev_term = min_term;
         terms_processed++;
         if (terms_processed % 10000 == 0) cout<<"Terms Processed : "<<terms_processed<<endl;
     }
     long document_count_per_term = get_documents_count_per_term(doc_freq_combined);
-    // inverted_index<<prev<<":"<<doc_freq_combined<<endl;
-    position+=compress(prev+":"+doc_freq_combined,bin_file);
+    inverted_index<<prev<<":"<<doc_freq_combined<<endl;
     lexicon<<prev<<" "<<term_id<<" "<<document_count_per_term<<" "<<position;
+    position+=(sizeof(unsigned long int) + compress(prev+":"+doc_freq_combined,bin_file));
     // lexicon<<prev<<" "<<term_id<<" "<<document_count_per_term<<endl;
     lexicon.close();
     inverted_index.close();
