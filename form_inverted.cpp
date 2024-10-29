@@ -113,7 +113,6 @@ int main()
         while (passage_stream >> word)
         {
             word = cleanWord(word);
-            // cout<<word<<endl;
             if (word.empty()) {
                 continue;
             }
@@ -136,7 +135,7 @@ int main()
     {
         write_intermediate_inverted_index(intermediate_file_index, intermediate_inverted_index);
     }
-    document_index<<total_word_count/total_documents;
+    document_index<<total_word_count/total_documents<<" "<<total_documents;
     document_index.close();
     file.close();
     return 0;

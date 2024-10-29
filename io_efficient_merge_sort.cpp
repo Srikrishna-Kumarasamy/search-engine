@@ -176,53 +176,72 @@ long get_documents_count_per_term(
     return doc_count;
 }
 
-                unsigned long int compress(
-                    string line,
-                    ofstream &bin_file
-                ) {
-                    vector<unsigned long int> lastDocIds;
-                    vector<unsigned long int> chunksize;
-                    stringstream lineStream(line);
-                    string token, data;
-                    getline(lineStream, token, ':');
-                    getline(lineStream, token, ':');
-                    stringstream dataStream(token);
-                    vector<unsigned long int> docList;
-                    vector<unsigned long int> freqList;
-                    while(getline(dataStream, data, ' '))
-                    {
-                        unsigned long int data_in_num;
-                        istringstream(data) >> data_in_num;
-                        docList.push_back(data_in_num);
-                        getline(dataStream, data, ' ');
-                        istringstream(data) >> data_in_num;
-                        freqList.push_back(data_in_num - 1);
-                    }
-                    docList= update_and_remove_gaps(docList, lastDocIds);
-                    vector<unsigned long int> docIdsChunkSize;
-                    vector<unsigned long int> freqsChunkSize;
-                    unsigned long int compressed_docid_size=0UL;
-                    unsigned long int compressed_freq_size=0UL;
-                    vector<vector<uint8_t>> compressed_doc_id_block_list= get_Varbyte_Encoded_List(docList, docIdsChunkSize, compressed_docid_size);
-                    vector<vector<uint8_t>> compressed_freq_block_list= get_Varbyte_Encoded_List(freqList, freqsChunkSize, compressed_freq_size);
-                    unsigned long int lastDocIdList_size = lastDocIds.size() ;
-                    vector<unsigned long int> finalChunkSizeList = mergeDocAndFreqChunks(docIdsChunkSize, freqsChunkSize);
-                    unsigned long int chunkList_size = finalChunkSizeList.size() ;
-                    unsigned long int totalBlockSize = sizeof(unsigned long int) + lastDocIdList_size * sizeof(unsigned long int) + sizeof(unsigned long int) + chunkList_size * sizeof(unsigned long int) + compressed_docid_size + compressed_freq_size;
-                    bin_file.write(reinterpret_cast<const char*>(&totalBlockSize), sizeof(totalBlockSize));
-                    bin_file.write(reinterpret_cast<const char*>(&lastDocIdList_size), sizeof(lastDocIdList_size));
-                    bin_file.write(reinterpret_cast<const char*>(lastDocIds.data()), sizeof(unsigned long int) * lastDocIds.size());
-                    bin_file.write(reinterpret_cast<const char*>(&chunkList_size), sizeof(chunkList_size));
-                    bin_file.write(reinterpret_cast<const char*>(finalChunkSizeList.data()), sizeof(unsigned long int) * finalChunkSizeList.size());
-                    store_mini_blocks_In_bin(bin_file,compressed_doc_id_block_list,compressed_freq_block_list);
-                    return totalBlockSize;
-                }
+unsigned long int compress(
+    string line,
+    ofstream &bin_file
+) {
+    vector<unsigned long int> lastDocIds;
+    vector<unsigned long int> chunksize;
+    stringstream lineStream(line);
+    string token, data;
+    getline(lineStream, token, ':');
+    getline(lineStream, token, ':');
+    stringstream dataStream(token);
+    vector<unsigned long int> docList;
+    vector<unsigned long int> freqList;
+    while(getline(dataStream, data, ' '))
+    {
+        unsigned long int data_in_num;
+        istringstream(data) >> data_in_num;
+        docList.push_back(data_in_num);
+        getline(dataStream, data, ' ');
+        istringstream(data) >> data_in_num;
+        freqList.push_back(data_in_num - 1);
+    }
+    docList= update_and_remove_gaps(docList, lastDocIds);
+    vector<unsigned long int> docIdsChunkSize;
+    vector<unsigned long int> freqsChunkSize;
+    unsigned long int compressed_docid_size=0UL;
+    unsigned long int compressed_freq_size=0UL;
+    vector<vector<uint8_t>> compressed_doc_id_block_list= get_Varbyte_Encoded_List(docList, docIdsChunkSize, compressed_docid_size);
+    vector<vector<uint8_t>> compressed_freq_block_list= get_Varbyte_Encoded_List(freqList, freqsChunkSize, compressed_freq_size);
+    unsigned long int lastDocIdList_size = lastDocIds.size();
+    vector<unsigned long int> finalChunkSizeList = mergeDocAndFreqChunks(docIdsChunkSize, freqsChunkSize);
+    unsigned long int chunkList_size = finalChunkSizeList.size();
+    unsigned long int totalBlockSize = sizeof(unsigned long int) + lastDocIdList_size * sizeof(unsigned long int) + sizeof(unsigned long int) + chunkList_size * sizeof(unsigned long int) + compressed_docid_size + compressed_freq_size;
+    bin_file.write(reinterpret_cast<const char*>(&totalBlockSize), sizeof(totalBlockSize));
+    bin_file.write(reinterpret_cast<const char*>(&lastDocIdList_size), sizeof(lastDocIdList_size));
+    bin_file.write(reinterpret_cast<const char*>(lastDocIds.data()), sizeof(unsigned long int) * lastDocIds.size());
+    bin_file.write(reinterpret_cast<const char*>(&chunkList_size), sizeof(chunkList_size));
+    bin_file.write(reinterpret_cast<const char*>(finalChunkSizeList.data()), sizeof(unsigned long int) * finalChunkSizeList.size());
+    store_mini_blocks_In_bin(bin_file,compressed_doc_id_block_list,compressed_freq_block_list);
+    return totalBlockSize;
+}
+
+int get_total_documents(ifstream& document_index) {
+    document_index.seekg(0, std::ios::end);
+    streampos fileSize = document_index.tellg();
+    string lastLine, avg_document_size, total_documents;
+    char ch;
+    for (std::streamoff i = 1; i < fileSize; ++i) {
+        document_index.seekg(-i, std::ios::end);
+        document_index.get(ch);
+        if (ch == '\n') {
+            getline(document_index, lastLine);
+            stringstream words(lastLine);
+            words>>avg_document_size>>total_documents;
+            return stoi(total_documents);
+        }
+    }
+    return -1;
+}
 
 int main() 
 {
     float BATCH_SIZE = 10000;
     unsigned long int position=0UL;
-    int num_of_intermediate_files = ceil(8841823/BATCH_SIZE);
+    ifstream document_index = ifstream("document_index.txt");
+    int num_of_intermediate_files = ceil(get_total_documents(document_index)/BATCH_SIZE);
     ofstream inverted_index = ofstream("final_inverted_index.txt");
     ofstream lexicon = ofstream("lexicon.txt");
     ofstream bin_file("data.bin", ios::binary);
@@ -254,7 +273,7 @@ int main()
             long document_count_per_term = get_documents_count_per_term(doc_freq_combined);
             inverted_index<<prev<<":"<<doc_freq_combined<<endl;
             lexicon<<prev<<" "<<term_id<<" "<<document_count_per_term<<" "<<position<<endl;
-            position+=(sizeof(unsigned long int)+compress(prev+":"+doc_freq_combined,bin_file));
+            position += (sizeof(unsigned long int) + compress(prev + ":" + doc_freq_combined, bin_file));
             doc_freq_combined = min_term.doc_frequency;
             term_id++;
         }
@@ -282,5 +301,6 @@ int main()
     position += (sizeof(unsigned long int) + compress(prev + ":" + doc_freq_combined, bin_file));
     lexicon.close();
     inverted_index.close();
+    document_index.close();
     return 0;
 }

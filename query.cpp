@@ -55,14 +55,16 @@ int find_document_size(
 int get_avg_document_size(ifstream& document_index) {
     document_index.seekg(0, std::ios::end);
     streampos fileSize = document_index.tellg();
-    string lastLine;
+    string lastLine, avg_document_size;
     char ch;
     for (std::streamoff i = 1; i < fileSize; ++i) {
         document_index.seekg(-i, std::ios::end);
         document_index.get(ch);
         if (ch == '\n') {
             getline(document_index, lastLine);
-            return stoi(lastLine);
+            stringstream words(lastLine);
+            words>>avg_document_size;
+            return stoi(avg_document_size);
         }
     }
     return -1;
@@ -303,32 +305,32 @@ priority_queue<DocumentScore> query_process(
     return max_heap_score;
 }
 
-int main()
-{
-    while(true)
+void find_top_k_results(int k, priority_queue<DocumentScore> results) {
+    while(k > 0 && results.size() > 0)
     {
-        string query;
-        cout<<"Enter the terms to be searched : ";
-        getline(cin, query);
-        stringstream words(query);
-        string word;
-        vector<string> query_terms;
-        while(words>>word)
-        {
-            query_terms.push_back(word);
-        }
-        priority_queue<DocumentScore> result = query_process(query_terms);
-        if (result.size() == 0) {
-            cout<<"No documents found containing all the given query terms"<<endl;
-        }
-        int k = 10;
-        while(k > 0 && result.size() > 0)
-        {
-            DocumentScore resultDoc=result.top();
-            result.pop();
-            cout<<"Document ID = "<<resultDoc.docID<<" Score = "<<resultDoc.score<<endl;
-            k--;
-        }
+        DocumentScore resultDoc=results.top();
+        results.pop();
+        cout<<"<tr><td>"<<resultDoc.docID<<"</td><td>"<<resultDoc.score<<"</td></tr>";
+        k--;
     }
+}
+
+int main(int argc, char* argv[])
+{
+    if (argc < 2) {
+        cout << "No input provided.\n";
+        return 1;
+    }
+    string query = argv[1];
+    stringstream words(query);
+    string word;
+    vector<string> query_terms;
+    while(words>>word)
+    {
+        transform(word.begin(), word.end(), word.begin(), ::tolower);
+        query_terms.push_back(word);
+    }
+    const int k = 10;
+    find_top_k_results(k, query_process(query_terms));
     return 0;
 }
