@@ -157,15 +157,15 @@ int linear_search(
     vector<unsigned long int> arr,
     unsigned long int key
 ) {
-     unsigned long int currentDocID=0;
-     for(int i=0;i<arr.size();i++)
-     {
+    unsigned long int currentDocID=0;
+    for(int i=0;i<arr.size();i++)
+    {
         currentDocID+=arr[i];
         if(currentDocID==key)
         {
             return i;
         }
-     }
+    }
     return -1;
 }
 
@@ -218,6 +218,7 @@ void get_mini_block_DocIDs_and_Freq(
     for(unsigned long int i=0; i<lastdocsize; i++)
     {
         if(docID_to_be_searched <= read_Last_docIds_data[i]) {
+            bin_in_file.seekg(total_chunk_Size,ios::cur);
             vector<u_int8_t> miniBlock_DocID_compressed(read_chunksize_data[2 * i]);
             vector<u_int8_t> miniBlock_Freq_compressed(read_chunksize_data[(2 * i) + 1]);
             bin_in_file.read(reinterpret_cast<char*>(miniBlock_DocID_compressed.data()), miniBlock_DocID_compressed.size());
@@ -227,7 +228,7 @@ void get_mini_block_DocIDs_and_Freq(
             break;
         }
         total_chunk_Size += read_chunksize_data[(2 * i)] + read_chunksize_data [(2 * i) + 1];
-    }            
+    }
 }
 
 priority_queue<DocumentScore> query_process(
@@ -310,27 +311,28 @@ void find_top_k_results(int k, priority_queue<DocumentScore> results) {
     {
         DocumentScore resultDoc=results.top();
         results.pop();
-        cout<<"<tr><td>"<<resultDoc.docID<<"</td><td>"<<resultDoc.score<<"</td></tr>";
+        cout<<resultDoc.docID<<" "<<resultDoc.score<<endl;
         k--;
     }
 }
 
-int main(int argc, char* argv[])
+int main()
 {
-    if (argc < 2) {
-        cout << "No input provided.\n";
-        return 1;
-    }
-    string query = argv[1];
-    stringstream words(query);
-    string word;
-    vector<string> query_terms;
-    while(words>>word)
+    while(true)
     {
-        transform(word.begin(), word.end(), word.begin(), ::tolower);
-        query_terms.push_back(word);
+        cout<<"Enter the terms to be searched for : ";
+        string query;
+        getline(cin, query);
+        stringstream words(query);
+        string word;
+        vector<string> query_terms;
+        while(words>>word)
+        {
+            transform(word.begin(), word.end(), word.begin(), ::tolower);
+            query_terms.push_back(word);
+        }
+        const int k = 10;
+        find_top_k_results(k, query_process(query_terms));
     }
-    const int k = 10;
-    find_top_k_results(k, query_process(query_terms));
     return 0;
 }
