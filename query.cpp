@@ -190,19 +190,19 @@ vector<unsigned long> varbyte_decompress(
 
 void get_inverted_index_Metadatas_based_on_position(
     ifstream& bin_in_file,
-    unsigned long int &lastdocsize,
-    vector<unsigned long int> &read_Last_docIds_data,
-    unsigned long int &lengthOfChunksizeList,
-    vector<unsigned long int> &read_chunksize_data
+    unsigned long int &last_docids_list_size,
+    vector<unsigned long int> &last_docids_of_batches,
+    unsigned long int &chunksize_list_size,
+    vector<unsigned long int> &batch_chunksize
 ) {
     unsigned long int totalsize=0UL;
     bin_in_file.read(reinterpret_cast<char*>(&totalsize), sizeof(totalsize));
-    bin_in_file.read(reinterpret_cast<char*>(&lastdocsize), sizeof(lastdocsize)); 
-    read_Last_docIds_data.resize(lastdocsize);
-    bin_in_file.read(reinterpret_cast<char*>( read_Last_docIds_data.data()), read_Last_docIds_data.size()*8);
-    bin_in_file.read(reinterpret_cast<char*>(&lengthOfChunksizeList), sizeof(lengthOfChunksizeList)); 
-    read_chunksize_data.resize(lengthOfChunksizeList);
-    bin_in_file.read(reinterpret_cast<char*>( read_chunksize_data.data()), read_chunksize_data.size()*8);
+    bin_in_file.read(reinterpret_cast<char*>(&last_docids_list_size), sizeof(last_docids_list_size)); 
+    last_docids_of_batches.resize(last_docids_list_size);
+    bin_in_file.read(reinterpret_cast<char*>(last_docids_of_batches.data()), last_docids_of_batches.size()*8);
+    bin_in_file.read(reinterpret_cast<char*>(&chunksize_list_size), sizeof(chunksize_list_size)); 
+    batch_chunksize.resize(chunksize_list_size);
+    bin_in_file.read(reinterpret_cast<char*>(batch_chunksize.data()), batch_chunksize.size()*8);
 }
 
 void get_mini_block_DocIDs_and_Freq(
@@ -243,64 +243,39 @@ priority_queue<DocumentScore> query_process(
     priority_queue<DocumentScore> max_heap_score;
     if (lexicon_terms.size() == 0)
         return max_heap_score;
-    sort(lexicon_terms.begin(), lexicon_terms.end());
     ifstream bin_in_file("data.bin", ios::binary);
-    unsigned long int lastdocsize=0UL;
-    vector<unsigned long int> read_Last_docIds_data;
-    unsigned long int lengthOfChunksizeList=0UL;
-    vector<unsigned long int> read_chunksize_data;
-    bin_in_file.seekg(lexicon_terms[0].binary_position,ios::cur);
-    get_inverted_index_Metadatas_based_on_position(bin_in_file, lastdocsize, read_Last_docIds_data, lengthOfChunksizeList, read_chunksize_data);
-    double primaryTermScore=0.0, otherScores=0.0;
-    for(unsigned long int i=0; i<lastdocsize; i++)
+    unordered_map<unsigned long int, double> document_score_map;
+    for(int term_index = 0; term_index < lexicon_terms.size(); term_index++)
     {
-        vector<u_int8_t> docId_compressed_list(read_chunksize_data[(2 * i)]);
-        bin_in_file.read(reinterpret_cast<char*>(docId_compressed_list.data()), docId_compressed_list.size());
-        vector<u_int8_t> freq_compressed_list(read_chunksize_data[ (2*i)+1 ] );
-        bin_in_file.read(reinterpret_cast<char*>(freq_compressed_list.data()), freq_compressed_list.size());
-        vector<unsigned long int> decompressed_docID_block = varbyte_decompress(docId_compressed_list);
-        vector<unsigned long int> decompressed_freq_block = varbyte_decompress(freq_compressed_list);
-        unsigned long int currentDocID=0;
-        for(int blockIndex=0; blockIndex < decompressed_docID_block.size(); blockIndex++)
+        unsigned long int last_docids_list_size=0UL;
+        vector<unsigned long int> last_docids_of_batches;
+        unsigned long int chunksize_list_size=0UL;
+        vector<unsigned long int> batch_chunksize;
+        bin_in_file.seekg(lexicon_terms[term_index].binary_position);
+        get_inverted_index_Metadatas_based_on_position(bin_in_file, last_docids_list_size, last_docids_of_batches, chunksize_list_size, batch_chunksize);
+        for(unsigned long int block_index=0; block_index<last_docids_list_size; block_index++)
         {
-            currentDocID += decompressed_docID_block[blockIndex];
-            int document_size = find_document_size(document_index, currentDocID);
-            primaryTermScore = calculateBM25(document_size, avg_document_size, 8400000, decompressed_freq_block[blockIndex], lexicon_terms[0].number_of_documents);
-            bool found_all_terms = true;
-            if(lexicon_terms.size() > 1)
+            vector<u_int8_t> docId_compressed_list(batch_chunksize[(2 * block_index)]);
+            bin_in_file.read(reinterpret_cast<char*>(docId_compressed_list.data()), docId_compressed_list.size());
+            vector<u_int8_t> freq_compressed_list(batch_chunksize[(2 * block_index) + 1]);
+            bin_in_file.read(reinterpret_cast<char*>(freq_compressed_list.data()), freq_compressed_list.size());
+            vector<unsigned long int> decompressed_docID_block = varbyte_decompress(docId_compressed_list);
+            vector<unsigned long int> decompressed_freq_block = varbyte_decompress(freq_compressed_list);
+            unsigned long int currentDocID=0;
+            for(int i=0; i < decompressed_docID_block.size(); i++)
             {
-                for(unsigned long int index=1; index < lexicon_terms.size(); index++)
-                {
-                    ifstream invertedList_term_pointer("data.bin", ios::binary);
-                    unsigned long int lastdocsize = 0UL;
-                    vector<unsigned long int> read_Last_docIds_data;
-                    unsigned long int lengthOfChunksizeList = 0UL;
-                    vector<unsigned long int> read_chunksize_data;
-                    invertedList_term_pointer.seekg(lexicon_terms[index].binary_position , ios::beg);
-                    get_inverted_index_Metadatas_based_on_position(invertedList_term_pointer, lastdocsize, read_Last_docIds_data, lengthOfChunksizeList, read_chunksize_data);
-                    vector<unsigned long int> miniBlock_DocID;
-                    vector<unsigned long int> miniBlock_Freq;
-                    get_mini_block_DocIDs_and_Freq(invertedList_term_pointer, currentDocID, miniBlock_DocID, miniBlock_Freq, lastdocsize, read_chunksize_data, read_Last_docIds_data);
-                    int mini_block_position = 0;
-                    if((mini_block_position = linear_search(miniBlock_DocID, currentDocID)) != -1)
-                    {
-                        document_size=find_document_size(document_index,miniBlock_DocID[mini_block_position]);
-                        otherScores+=calculateBM25( document_size,avg_document_size,8400000,miniBlock_Freq[mini_block_position], lexicon_terms[index].number_of_documents);
-                    }
-                    else{
-                        found_all_terms = false;
-                        break;
-                    }
-                    invertedList_term_pointer.close();
-                }
-                if(!found_all_terms)
-                {
-                    otherScores=0.0;
-                    continue;
+                currentDocID = currentDocID + decompressed_docID_block[i];
+                int document_size = find_document_size(document_index, currentDocID);
+                double document_score = calculateBM25(document_size, avg_document_size, 8400000, decompressed_freq_block[i], lexicon_terms[term_index].number_of_documents);
+                if (document_score_map.find(currentDocID) != document_score_map.end()) {
+                    document_score_map[currentDocID] = document_score_map[currentDocID] + document_score;
+                } else {
+                    document_score_map[currentDocID] = document_score;
                 }
             }
-        max_heap_score.push(DocumentScore(currentDocID, primaryTermScore + otherScores));
-        otherScores=0.0;
+        }
+        for (const auto& pair : document_score_map) {
+            max_heap_score.push(DocumentScore(pair.first, pair.second));
         }
     }
     return max_heap_score;
