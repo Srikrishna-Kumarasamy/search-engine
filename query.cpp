@@ -351,22 +351,53 @@ priority_queue<DocumentScore> query_process(
 }
 
 void find_top_k_results(int k, priority_queue<DocumentScore> results) {
+    ofstream top_k_queries_entry("Top_K_Results.txt",std::ios::app);
     while(k > 0 && results.size() > 0)
     {
         DocumentScore resultDoc=results.top();
         results.pop();
+        top_k_queries_entry<<resultDoc.docID<<" ";
         cout<<resultDoc.docID<<" "<<resultDoc.score<<endl;
         k--;
     }
+    top_k_queries_entry<<endl;
+    top_k_queries_entry.close();
 }
 
 int main()
 {
-    while(true)
+    // while(true)
+    // {
+    //     cout<<"Enter the terms to be searched for : ";
+    //     string query;
+    //     getline(cin, query);
+    //     stringstream words(query);
+    //     string word;
+    //     vector<string> query_terms;
+    //     while(words>>word)
+    //     {
+    //         transform(word.begin(), word.end(), word.begin(), ::tolower);
+    //         query_terms.push_back(word);
+    //     }
+    //     const int k = 10;
+    //     cout<<"----------------"<<endl;
+    //     find_top_k_results(k, query_process(query_terms));
+    //     cout<<"----------------"<<endl;
+    //     find_top_k_results(k, query_process(query_terms, "Conjunctive"));
+    //     cout<<"----------------"<<endl;
+    // }
+
+     ofstream fileClear("Top_K_Results.txt", std::ios::trunc);
+    fileClear.close();
+    ifstream file("queries.dev.tsv");
+    string line;
+    while (getline(file, line))
     {
-        cout<<"Enter the terms to be searched for : ";
-        string query;
-        getline(cin, query);
+        if (line.empty()) continue;
+        istringstream line_stream(line);
+        string query_id, query;
+        getline(line_stream, query_id, '\t');
+        getline(line_stream, query);
         stringstream words(query);
         string word;
         vector<string> query_terms;
@@ -376,11 +407,8 @@ int main()
             query_terms.push_back(word);
         }
         const int k = 10;
-        cout<<"----------------"<<endl;
         find_top_k_results(k, query_process(query_terms));
-        cout<<"----------------"<<endl;
-        find_top_k_results(k, query_process(query_terms, "Conjunctive"));
-        cout<<"----------------"<<endl;
+
     }
     return 0;
 }
