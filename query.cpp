@@ -2,6 +2,7 @@
 #include<fstream>
 #include<string.h>
 #include<sstream>
+#include<set>
 
 using namespace std;
 
@@ -350,8 +351,10 @@ priority_queue<DocumentScore> query_process(
     }
 }
 
-void find_top_k_results(int k, priority_queue<DocumentScore> results) {
-    ofstream top_k_queries_entry("Top_K_Results.txt",std::ios::app);
+void find_top_k_results(string filename,string query_id,int k, priority_queue<DocumentScore> results) {
+    ofstream top_k_queries_entry(filename,std::ios::app);
+    top_k_queries_entry<<query_id<<" : ";
+
     while(k > 0 && results.size() > 0)
     {
         DocumentScore resultDoc=results.top();
@@ -386,18 +389,41 @@ int main()
     //     find_top_k_results(k, query_process(query_terms, "Conjunctive"));
     //     cout<<"----------------"<<endl;
     // }
+     vector<string> evaluation_file_names = {"qrels.dev.tsv"};
+     vector<string> input_file_names={"queries.dev.tsv"};
 
-     ofstream fileClear("Top_K_Results.txt", std::ios::trunc);
+    // Traverse using a range-based for loop
+    for (int index_file=0;index_file< evaluation_file_names.size();index_file++) 
+    {
+        
+        string customQueryLine;
+        set<string> customQuerySet;
+        ifstream customQuery(evaluation_file_names[index_file]);
+        while(getline(customQuery,customQueryLine))
+    {
+        if (customQueryLine.empty()) continue;
+        istringstream line_stream(customQueryLine);
+        string customQuery_id;
+        getline(line_stream, customQuery_id, '\t');
+        customQuerySet.insert(customQuery_id);
+    }
+    cout<<"Length of the customQuery set is :"<<customQuerySet.size();
+    string outputFileName=format("Top_K_Results_BM25_{}.txt",evaluation_file_names[index_file]);
+    ofstream fileClear(outputFileName, std::ios::trunc);
     fileClear.close();
-    ifstream file("queries.dev.tsv");
+    ifstream file(input_file_names[index_file]);
     string line;
+    
     while (getline(file, line))
     {
         if (line.empty()) continue;
         istringstream line_stream(line);
         string query_id, query;
         getline(line_stream, query_id, '\t');
+        if(customQuerySet.count(query_id)==0)
+        continue;
         getline(line_stream, query);
+        cout<<"Query : "<<query<<endl;
         stringstream words(query);
         string word;
         vector<string> query_terms;
@@ -407,8 +433,12 @@ int main()
             query_terms.push_back(word);
         }
         const int k = 10;
-        find_top_k_results(k, query_process(query_terms));
+        cout<<"Query Terms : "<<query_terms.size();
+        find_top_k_results(outputFileName,query_id,k, query_process(query_terms));
 
     }
+
+    }
+    
     return 0;
 }
