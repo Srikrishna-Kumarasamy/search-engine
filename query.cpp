@@ -389,8 +389,8 @@ int main()
     //     find_top_k_results(k, query_process(query_terms, "Conjunctive"));
     //     cout<<"----------------"<<endl;
     // }
-     vector<string> evaluation_file_names = {"qrels.dev.tsv"};
-     vector<string> input_file_names={"queries.dev.tsv"};
+     vector<string> evaluation_file_names = {"qrels.dev.tsv","qrels.eval.one.tsv","qrels.eval.two.tsv"};
+     vector<string> input_file_names={"queries.dev.tsv","queries.eval.tsv","queries.eval.tsv"};
 
     // Traverse using a range-based for loop
     for (int index_file=0;index_file< evaluation_file_names.size();index_file++) 
@@ -432,7 +432,7 @@ int main()
             transform(word.begin(), word.end(), word.begin(), ::tolower);
             query_terms.push_back(word);
         }
-        const int k = 10;
+        const int k = 100;
         cout<<"Query Terms : "<<query_terms.size();
         find_top_k_results(outputFileName,query_id,k, query_process(query_terms));
 
